@@ -29,6 +29,7 @@ setup(
     license='Apache-2.0',
     entry_points={'console_scripts': [
         'map_merge_node = swarm_bringup.map_merge_node:main',
+        'frontier_coordinator = swarm_bringup.frontier_coordinator:main',
         'swarm_teleop = swarm_bringup.swarm_teleop:main',
     ]},
 )

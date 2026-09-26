@@ -282,6 +282,17 @@ Visualization Manager:
             Value: /scout_1/global_costmap/costmap_updates
           Use Timestamp: false
           Value: false
+        - Class: rviz_default_plugins/MarkerArray
+          Enabled: true
+          Name: Frontiers
+          Namespaces: {}
+          Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /scout_1/explore/frontiers
+          Value: true
       Enabled: true
       Name: scout_1
     - Class: rviz_common/Group
@@ -496,6 +507,17 @@ Visualization Manager:
             Value: /scout_2/global_costmap/costmap_updates
           Use Timestamp: false
           Value: false
+        - Class: rviz_default_plugins/MarkerArray
+          Enabled: true
+          Name: Frontiers
+          Namespaces: {}
+          Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /scout_2/explore/frontiers
+          Value: true
       Enabled: true
       Name: scout_2
     - Class: rviz_common/Group
@@ -710,8 +732,30 @@ Visualization Manager:
             Value: /mapper_1/global_costmap/costmap_updates
           Use Timestamp: false
           Value: false
+        - Class: rviz_default_plugins/MarkerArray
+          Enabled: true
+          Name: Frontiers
+          Namespaces: {}
+          Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /mapper_1/explore/frontiers
+          Value: true
       Enabled: true
       Name: mapper_1
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Coordinator
+      Namespaces: {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /coordinator/markers
+      Value: true
     - Class: rviz_default_plugins/TF
       Enabled: false
       Frame Timeout: 15
