@@ -169,10 +169,11 @@
       <odom_publish_frequency>30</odom_publish_frequency>
     </plugin>
 
-    <plugin filename="libignition-gazebo-joint-state-publisher-system.so"
-            name="ignition::gazebo::systems::JointStatePublisher">
-      <topic>/model/${name}/joint_states</topic>
-    </plugin>
+    <!-- No Gazebo JointStatePublisher: in Fortress it publishes on every
+         physics step (1 kHz), so robot_state_publisher re-published the
+         wheel TFs at 1 kHz per robot and every TF listener had to decode
+         them. spawn_swarm.launch.py publishes the wheel frames as static
+         transforms instead (wheels only matter for display). -->
   </gazebo>
 
   <gazebo reference="lidar_link">
