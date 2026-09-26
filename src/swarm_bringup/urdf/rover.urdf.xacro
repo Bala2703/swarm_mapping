@@ -31,6 +31,14 @@
   <xacro:property name="lidar_range"   value="${6.0  if is_scout else 12.0}" />
   <xacro:property name="lidar_samples" value="${360  if is_scout else 720}" />
 
+  <!-- How far the chassis (and the caster and lidar with it) sits ahead of
+       the wheel axle. The robot pivots on the axle, so the center of mass
+       must be clearly ahead of it: at 0 it was only 3-6 mm ahead, and any
+       forward acceleration tipped the rovers onto their tails (measured
+       15.2 deg scout / 12.9 deg mapper). These offsets raise the tip
+       threshold to roughly 4.7 / 6 m/s^2, well above the DiffDrive limit. -->
+  <xacro:property name="chassis_offset_x" value="${0.03 if is_scout else 0.06}" />
+
   <!-- ===================================================================
        Links
        =================================================================== -->
@@ -52,7 +60,7 @@
 
   <joint name="base_to_chassis" type="fixed">
     <parent link="base_link" /><child link="chassis_link" />
-    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0" />
+    <origin xyz="${chassis_offset_x} 0 ${wheel_radius}" rpy="0 0 0" />
   </joint>
 
   <!-- wheels: macro'd so left/right only differ by Y sign -->
@@ -81,7 +89,8 @@
   <xacro:wheel side="left"  y_sign="1" />
   <xacro:wheel side="right" y_sign="-1" />
 
-  <!-- a simple caster so the chassis doesn't tip -->
+  <!-- front caster at the chassis nose (frictionless: see the gazebo block
+       for caster_link below) -->
   <link name="caster_link">
     <visual><geometry><sphere radius="${wheel_radius * 0.6}" /></geometry></visual>
     <collision><geometry><sphere radius="${wheel_radius * 0.6}" /></geometry></collision>
@@ -92,7 +101,7 @@
   </link>
   <joint name="caster_joint" type="fixed">
     <parent link="base_link" /><child link="caster_link" />
-    <origin xyz="${chassis_len/2 - wheel_radius*0.6} 0 ${-wheel_radius*0.4}" rpy="0 0 0" />
+    <origin xyz="${chassis_offset_x + chassis_len/2 - wheel_radius*0.6} 0 ${-wheel_radius*0.4}" rpy="0 0 0" />
   </joint>
 
   <!-- lidar mast -->
@@ -136,7 +145,17 @@
       <right_joint>right_wheel_joint</right_joint>
       <wheel_separation>${wheel_sep}</wheel_separation>
       <wheel_radius>${wheel_radius}</wheel_radius>
+      <!-- Symmetric limits: with only max_linear_acceleration set, stops,
+           reverse starts and turns were instantaneous (wheel slip), and the
+           per-class speed caps above were never applied. -->
       <max_linear_acceleration>1.0</max_linear_acceleration>
+      <min_linear_acceleration>-1.0</min_linear_acceleration>
+      <max_angular_acceleration>2.0</max_angular_acceleration>
+      <min_angular_acceleration>-2.0</min_angular_acceleration>
+      <max_linear_velocity>${max_lin_vel}</max_linear_velocity>
+      <min_linear_velocity>${-max_lin_vel}</min_linear_velocity>
+      <max_angular_velocity>${max_ang_vel}</max_angular_velocity>
+      <min_angular_velocity>${-max_ang_vel}</min_angular_velocity>
       <topic>/model/${name}/cmd_vel</topic>
       <odom_topic>/model/${name}/odometry</odom_topic>
       <!-- tf_topic publishes odom->base_link as a Pose_V message,
@@ -159,7 +178,11 @@
   <gazebo reference="lidar_link">
     <sensor name="lidar" type="gpu_lidar">
       <topic>/world/exploration_test/model/${name}/lidar</topic>
-      <frame_id>lidar_link</frame_id>
+      <!-- Fortress ignores plain <frame_id> (scans came out as
+           <name>/base_link/lidar). ignition_frame_id stamps them with the
+           prefixed link robot_state_publisher already publishes, so the
+           scan TF follows this xacro instead of a hand-typed static TF. -->
+      <ignition_frame_id>${name}/lidar_link</ignition_frame_id>
       <update_rate>10</update_rate>
       <always_on>true</always_on>
       <visualize>false</visualize>
@@ -178,6 +201,14 @@
         </range>
       </lidar>
     </sensor>
+  </gazebo>
+
+  <!-- Frictionless caster: it now carries real weight, and a mu=1 sphere
+       would drag in turns and corrupt odometry. This reference survives
+       the URDF->SDF fixed-joint lumping into base_link. -->
+  <gazebo reference="caster_link">
+    <mu1>0.0</mu1>
+    <mu2>0.0</mu2>
   </gazebo>
 
   <gazebo reference="imu_link">

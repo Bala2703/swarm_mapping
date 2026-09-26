@@ -3,10 +3,10 @@ Brings up the swarm (via spawn_swarm.launch.py) and adds one
 async_slam_toolbox_node per robot, each mapping independently into its
 own namespaced frame tree.
 
-This does NOT merge the per-robot maps into a single shared map yet —
-that's the next piece. For now each robot in `ros2 topic list` gets its
-own /<name>/map, useful on its own for verifying SLAM is working before
-merging is layered on top.
+It also publishes a static world -> <name>/map transform per robot (its
+fleet_config spawn pose), so all robots share one `world` root frame —
+the frame map_merge_node publishes /map_merged in and RViz uses as its
+fixed frame. The merge node itself is still started separately.
 
 Usage:
     ros2 launch swarm_bringup slam_swarm.launch.py
@@ -63,6 +63,29 @@ def generate_launch_description():
                     ("/map", f"/{name}/map"),
                     ("/map_metadata", f"/{name}/map_metadata"),
                     ("/map_updates", f"/{name}/map_updates"),
+                ],
+            )
+        )
+
+        # --- anchor this robot's map frame in the shared `world` frame ---
+        # slam_toolbox's <name>/map starts at the robot's spawn pose, so the
+        # world -> <name>/map offset is exactly its fleet_config pose. This
+        # joins every robot's TF tree under one root.
+        nodes.append(
+            Node(
+                package="tf2_ros",
+                executable="static_transform_publisher",
+                namespace=name,
+                name="world_to_map",
+                arguments=[
+                    "--x", str(x),
+                    "--y", str(y),
+                    "--z", "0",
+                    "--roll", "0",
+                    "--pitch", "0",
+                    "--yaw", str(yaw),
+                    "--frame-id", "world",
+                    "--child-frame-id", f"{name}/map",
                 ],
             )
         )

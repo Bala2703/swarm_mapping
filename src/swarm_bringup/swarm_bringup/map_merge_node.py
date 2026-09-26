@@ -87,7 +87,10 @@ class MapMergeNode(Node):
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
             depth=1,
         )
-        self._merged_data = [-1] * (MERGED_WIDTH * MERGED_HEIGHT)
+        # Latest full map per robot. slam_toolbox re-rasterises its whole map
+        # from the optimised pose graph on every publish, so only the newest
+        # message from each robot is valid -- older ones are superseded.
+        self._latest_data = {name: None for name in FLEET_POSES}
         self.map_subscribers = {
             name: self.create_subscription(
                 OccupancyGrid,
@@ -98,39 +101,51 @@ class MapMergeNode(Node):
             for name in FLEET_POSES
         }
         self.map_publisher = self.create_publisher(OccupancyGrid, '/map_merged', map_qos)
+        self.create_timer(1.0, self._rebuild_merged_map)
 
     def map_callback(self, msg, robot_name):
-        self._merge_into_output(msg, robot_name)
-        self._publish_merged()
+        self._latest_data[robot_name] = msg
 
-    def _merge_into_output(self, msg, robot_name):
+    def _rebuild_merged_map(self):
+        """Merge every robot's latest map into a fresh grid, so anything a
+        robot's SLAM no longer believes drops out of the merged map too."""
+        maps = {name: msg for name, msg in self._latest_data.items() if msg is not None}
+        if not maps:
+            return
+        grid = [-1] * (MERGED_WIDTH * MERGED_HEIGHT)
+        for robot_name, msg in maps.items():
+            self._merge_into_output(grid, msg, robot_name)
+        self._publish_merged(grid)
+
+    def _merge_into_output(self, grid, msg, robot_name):
         width = msg.info.width
         for i, value in enumerate(msg.data):
             if value == -1:
                 continue
             row, col = divmod(i, width)
             shared_x, shared_y = cell_to_shared_frame(msg, row, col, robot_name)
-            out_col = int((shared_x - MERGED_ORIGIN_X) / MERGED_RESOLUTION)
-            out_row = int((shared_y - MERGED_ORIGIN_Y) / MERGED_RESOLUTION)
+            # floor, not int(): int() truncates toward zero, which would fold
+            # points just past the -x/-y edge into column/row 0.
+            out_col = math.floor((shared_x - MERGED_ORIGIN_X) / MERGED_RESOLUTION)
+            out_row = math.floor((shared_y - MERGED_ORIGIN_Y) / MERGED_RESOLUTION)
             if not (0 <= out_row < MERGED_HEIGHT and 0 <= out_col < MERGED_WIDTH):
                 continue
             out_index = out_row * MERGED_WIDTH + out_col
-            self._merged_data[out_index] = merge_cell(self._merged_data[out_index], value)
+            grid[out_index] = merge_cell(grid[out_index], value)
 
-    def _publish_merged(self):
+    def _publish_merged(self, grid):
         out = OccupancyGrid()
         out.header.stamp = self.get_clock().now().to_msg()
-        # mapper_1 spawns at (0, 0, yaw=0) in fleet_config.py, so its own
-        # `map` frame IS the shared frame this node computes into -- no new
-        # frame or static transform needed for the merged output.
-        out.header.frame_id = 'mapper_1/map'
+        # Shared frame: world -> <name>/map static transforms, built from the
+        # same fleet_config poses used above, connect it to every robot's TF tree.
+        out.header.frame_id = 'world'
         out.info.resolution = MERGED_RESOLUTION
         out.info.width = MERGED_WIDTH
         out.info.height = MERGED_HEIGHT
         out.info.origin.position.x = MERGED_ORIGIN_X
         out.info.origin.position.y = MERGED_ORIGIN_Y
         out.info.origin.orientation.w = 1.0
-        out.data = list(self._merged_data)
+        out.data = grid
         self.map_publisher.publish(out)
 
 

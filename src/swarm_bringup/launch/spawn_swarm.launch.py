@@ -130,23 +130,8 @@ def generate_launch_description():
                 ],
             )
         )
-        lidar_z = 0.093 if robot_class == "scout" else 0.13
-        nodes.append(
-            Node(
-                package="tf2_ros",
-                executable="static_transform_publisher",
-                namespace=name,
-                arguments=[
-                    "--x", "0",
-                    "--y", "0",
-                    "--z", str(lidar_z),
-                    "--roll", "0",
-                    "--pitch", "0",
-                    "--yaw", "0",
-                    "--frame-id", f"{name}/base_link",
-                    "--child-frame-id", f"{name}/base_link/lidar",
-                ],
-            )
-        )
+        # No lidar static TF here: the xacro's <ignition_frame_id> stamps
+        # scans with <name>/lidar_link, which robot_state_publisher already
+        # publishes from the URDF.
 
     return LaunchDescription(nodes)
