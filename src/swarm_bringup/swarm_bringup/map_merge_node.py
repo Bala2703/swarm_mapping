@@ -6,9 +6,13 @@ pose (verified: scout_1/map -> scout_1/base_link is identity at t=0, and the
 fleet_pose . info.origin . cell-offset composition below was checked cell by
 cell against exploration_test.sdf's known wall positions before this loop
 was written).
+
+Before publishing, narrow unknown gaps between free cells (the space between
+far-apart lidar rays) are filled in; see fill_ray_gaps.
 """
 import math
 
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSReliabilityPolicy
@@ -79,6 +83,46 @@ def merge_cell(existing, new):
     return existing
 
 
+def fill_ray_gaps(grid):
+    """Return the merged grid with narrow unknown gaps between free cells
+    marked free: a 3x3 morphological closing of the free cells, applied to
+    unknown cells only. It fills gaps up to 2 cells (10 cm) wide.
+
+    Why: far from a lidar its rays are more than one cell apart (1 deg rays
+    are 5 cm apart at 2.9 m), so the cells between them stay unknown.
+    explore_lite counts unknown cells next to free space as frontier, so these
+    specks become frontiers that robots chase. Occupied cells are never
+    changed, and it cannot reach past a wall into unexplored space: a cell is
+    filled only if everything around it is within one cell of free space."""
+    g = np.array(grid, dtype=np.int8).reshape(MERGED_HEIGHT, MERGED_WIDTH)
+    closed = _erode3(_dilate3(g == 0))
+    g[closed & (g == -1)] = 0
+    return g.ravel().tolist()
+
+
+def _dilate3(mask):
+    """True where any cell of the 3x3 neighbourhood is True."""
+    h, w = mask.shape
+    padded = np.pad(mask, 1, constant_values=False)
+    out = np.zeros_like(mask)
+    for dy in range(3):
+        for dx in range(3):
+            out |= padded[dy:dy + h, dx:dx + w]
+    return out
+
+
+def _erode3(mask):
+    """True where every cell of the 3x3 neighbourhood is True (cells past
+    the grid edge count as False)."""
+    h, w = mask.shape
+    padded = np.pad(mask, 1, constant_values=False)
+    out = np.ones_like(mask)
+    for dy in range(3):
+        for dx in range(3):
+            out &= padded[dy:dy + h, dx:dx + w]
+    return out
+
+
 class MapMergeNode(Node):
     def __init__(self):
         super().__init__('map_merge_node')
@@ -115,7 +159,7 @@ class MapMergeNode(Node):
         grid = [-1] * (MERGED_WIDTH * MERGED_HEIGHT)
         for robot_name, msg in maps.items():
             self._merge_into_output(grid, msg, robot_name)
-        self._publish_merged(grid)
+        self._publish_merged(fill_ray_gaps(grid))
 
     def _merge_into_output(self, grid, msg, robot_name):
         width = msg.info.width

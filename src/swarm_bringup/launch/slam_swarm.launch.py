@@ -4,9 +4,9 @@ async_slam_toolbox_node per robot, each mapping independently into its
 own namespaced frame tree.
 
 It also publishes a static world -> <name>/map transform per robot (its
-fleet_config spawn pose), so all robots share one `world` root frame —
-the frame map_merge_node publishes /map_merged in and RViz uses as its
-fixed frame. The merge node itself is still started separately.
+fleet_config spawn pose), so all robots share one `world` root frame, and
+starts map_merge_node, which combines every robot's map into /map_merged
+in that frame (RViz and the explorers read it).
 
 Usage:
     ros2 launch swarm_bringup slam_swarm.launch.py
@@ -34,7 +34,16 @@ def generate_launch_description():
         )
     )
 
-    nodes = [spawn_swarm]
+    # --- one shared merged map of all robots, in `world` ---
+    map_merge = Node(
+        package="swarm_bringup",
+        executable="map_merge_node",
+        name="map_merge_node",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
+
+    nodes = [spawn_swarm, map_merge]
 
     for name, robot_class, x, y, yaw in FLEET:
         nodes.append(
