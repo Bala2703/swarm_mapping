@@ -1,0 +1,102 @@
+<?xml version="1.0" ?>
+<sdf version="1.8">
+  <world name="exploration_test">
+
+    <!-- Core system plugins. Fortress requires these to be listed
+         explicitly (Harmonic+ loads most of these by default). -->
+    <plugin filename="libignition-gazebo-physics-system.so"
+            name="ignition::gazebo::systems::Physics" />
+    <plugin filename="libignition-gazebo-user-commands-system.so"
+            name="ignition::gazebo::systems::UserCommands" />
+    <plugin filename="libignition-gazebo-scene-broadcaster-system.so"
+            name="ignition::gazebo::systems::SceneBroadcaster" />
+    <!-- Required for the lidar sensors on the rovers to produce data -->
+    <plugin filename="libignition-gazebo-sensors-system.so"
+            name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <!-- Required for the IMU sensors -->
+    <plugin filename="libignition-gazebo-imu-system.so"
+            name="ignition::gazebo::systems::Imu" />
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry>
+          <material>
+            <ambient>0.6 0.6 0.6 1</ambient>
+            <diffuse>0.6 0.6 0.6 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- A handful of rooms/corridors so frontier exploration has
+         something to do. Each wall is a static box; extend this
+         layout freely once the basic swarm is spawning correctly. -->
+    <model name="wall_outer_north">
+      <static>true</static>
+      <pose>0 6 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>12 0.2 1</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>12 0.2 1</size></box></geometry></visual>
+      </link>
+    </model>
+    <model name="wall_outer_south">
+      <static>true</static>
+      <pose>0 -6 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>12 0.2 1</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>12 0.2 1</size></box></geometry></visual>
+      </link>
+    </model>
+    <model name="wall_outer_east">
+      <static>true</static>
+      <pose>6 0 0.5 0 0 1.5708</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>12 0.2 1</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>12 0.2 1</size></box></geometry></visual>
+      </link>
+    </model>
+    <model name="wall_outer_west">
+      <static>true</static>
+      <pose>-6 0 0.5 0 0 1.5708</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>12 0.2 1</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>12 0.2 1</size></box></geometry></visual>
+      </link>
+    </model>
+
+    <!-- interior partition splitting the space into two rooms
+         with a corridor gap, to force exploration/coordination -->
+    <model name="wall_interior_1">
+      <static>true</static>
+      <pose>-1 2 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>6 0.2 1</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>6 0.2 1</size></box></geometry></visual>
+      </link>
+    </model>
+    <model name="wall_interior_2">
+      <static>true</static>
+      <pose>3 -1.5 0.5 0 0 1.5708</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>5 0.2 1</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>5 0.2 1</size></box></geometry></visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

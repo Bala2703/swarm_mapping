@@ -1,0 +1,48 @@
+# Shared across every robot's slam_toolbox instance. Frame names
+# (odom_frame/map_frame/base_frame) and scan_topic are intentionally
+# NOT set here — they're namespaced per robot in slam_swarm.launch.py.
+# The wildcard key below applies to every node these parameters get
+# attached to, regardless of its namespace.
+/**:
+  ros__parameters:
+    use_sim_time: true
+    mode: mapping
+
+    # -- plugin params --
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    # -- general --
+    resolution: 0.05
+    max_laser_range: 12.0          # >= the mapper class's lidar range;
+                                    # harmless for the shorter-range scouts
+    minimum_time_interval: 0.2
+    transform_publish_period: 0.02
+    map_update_interval: 2.0
+    transform_timeout: 0.3
+    tf_buffer_duration: 30.0
+    stack_size_to_use: 40000000
+    enable_interactive_mode: false
+    debug_logging: false
+    throttle_scans: 1
+
+    # -- matching / loop closure --
+    use_scan_matching: true
+    use_scan_barycenter: true
+    minimum_travel_distance: 0.3
+    minimum_travel_heading: 0.3
+    scan_buffer_size: 10
+    scan_buffer_maximum_scan_distance: 10.0
+    link_match_minimum_response_fine: 0.1
+    link_scan_diff_error_lower: 0.1
+    link_scan_diff_error_upper: 0.3
+    do_loop_closing: true
+    loop_search_maximum_distance: 3.0
+    loop_match_minimum_chain_size: 10
+    loop_match_maximum_variance_coarse: 3.0
+    loop_match_minimum_response_coarse: 0.35
+    loop_match_minimum_response_fine: 0.45

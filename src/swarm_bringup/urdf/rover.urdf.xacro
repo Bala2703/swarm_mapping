@@ -1,0 +1,192 @@
+<?xml version="1.0"?>
+<robot name="rover" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ===================================================================
+       Per-instance args, filled in from the launch file:
+         robot_name  : unique name, e.g. "scout_1" — used to namespace
+                       every Gazebo topic below so N robots don't collide.
+         robot_class : "scout" or "mapper" — picks chassis size + lidar
+                       spec via the xacro:if blocks further down.
+       =================================================================== -->
+  <xacro:arg name="robot_name" default="rover" />
+  <xacro:arg name="robot_class" default="scout" />
+  <xacro:property name="name" value="$(arg robot_name)" />
+  <xacro:property name="rclass" value="$(arg robot_class)" />
+
+  <!-- class-dependent physical/sensor parameters -->
+  <xacro:property name="is_scout" value="${rclass == 'scout'}" />
+
+  <!-- Scouts: small + fast + short-range lidar. Mappers: bigger, slower,
+       longer-range/finer-resolution lidar. Replace these with your real
+       rovers' actual dimensions once you're validating sim-to-real. -->
+  <xacro:property name="chassis_len"   value="${0.20 if is_scout else 0.36}" />
+  <xacro:property name="chassis_wid"   value="${0.16 if is_scout else 0.28}" />
+  <xacro:property name="chassis_h"     value="${0.08 if is_scout else 0.12}" />
+  <xacro:property name="chassis_mass"  value="${1.2  if is_scout else 4.5}" />
+  <xacro:property name="wheel_radius"  value="${0.033 if is_scout else 0.05}" />
+  <xacro:property name="wheel_width"   value="${0.026 if is_scout else 0.04}" />
+  <xacro:property name="wheel_sep"     value="${chassis_wid + wheel_width + 0.01}" />
+  <xacro:property name="max_lin_vel"   value="${1.2  if is_scout else 0.6}" />
+  <xacro:property name="max_ang_vel"   value="${2.0  if is_scout else 1.0}" />
+  <xacro:property name="lidar_range"   value="${6.0  if is_scout else 12.0}" />
+  <xacro:property name="lidar_samples" value="${360  if is_scout else 720}" />
+
+  <!-- ===================================================================
+       Links
+       =================================================================== -->
+  <link name="base_link" />
+
+  <link name="chassis_link">
+    <visual>
+      <geometry><box size="${chassis_len} ${chassis_wid} ${chassis_h}" /></geometry>
+      <material name="scout_mat"><color rgba="${0.9 if is_scout else 0.2} 0.5 0.2 1" /></material>
+    </visual>
+    <collision>
+      <geometry><box size="${chassis_len} ${chassis_wid} ${chassis_h}" /></geometry>
+    </collision>
+    <inertial>
+      <mass value="${chassis_mass}" />
+      <inertia ixx="0.02" ixy="0" ixz="0" iyy="0.03" iyz="0" izz="0.04" />
+    </inertial>
+  </link>
+
+  <joint name="base_to_chassis" type="fixed">
+    <parent link="base_link" /><child link="chassis_link" />
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0" />
+  </joint>
+
+  <!-- wheels: macro'd so left/right only differ by Y sign -->
+  <xacro:macro name="wheel" params="side y_sign">
+    <link name="${side}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.5708 0 0" />
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}" /></geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="1.5708 0 0" />
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}" /></geometry>
+      </collision>
+      <inertial>
+        <mass value="0.2" />
+        <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005" />
+      </inertial>
+    </link>
+    <joint name="${side}_wheel_joint" type="continuous">
+      <parent link="base_link" /><child link="${side}_wheel_link" />
+      <origin xyz="0 ${y_sign * wheel_sep / 2} 0" rpy="0 0 0" />
+      <axis xyz="0 1 0" />
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel side="left"  y_sign="1" />
+  <xacro:wheel side="right" y_sign="-1" />
+
+  <!-- a simple caster so the chassis doesn't tip -->
+  <link name="caster_link">
+    <visual><geometry><sphere radius="${wheel_radius * 0.6}" /></geometry></visual>
+    <collision><geometry><sphere radius="${wheel_radius * 0.6}" /></geometry></collision>
+    <inertial>
+      <mass value="0.1" />
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001" />
+    </inertial>
+  </link>
+  <joint name="caster_joint" type="fixed">
+    <parent link="base_link" /><child link="caster_link" />
+    <origin xyz="${chassis_len/2 - wheel_radius*0.6} 0 ${-wheel_radius*0.4}" rpy="0 0 0" />
+  </joint>
+
+  <!-- lidar mast -->
+  <link name="lidar_link">
+    <visual><geometry><cylinder radius="0.02" length="0.03" /></geometry></visual>
+    <collision><geometry><cylinder radius="0.02" length="0.03" /></geometry></collision>
+    <inertial>
+      <mass value="0.05" />
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001" />
+    </inertial>
+  </link>
+  <joint name="lidar_joint" type="fixed">
+    <parent link="chassis_link" /><child link="lidar_link" />
+    <origin xyz="0 0 ${chassis_h/2 + 0.02}" rpy="0 0 0" />
+  </joint>
+
+  <!-- imu (no visual geometry needed) -->
+  <link name="imu_link" />
+  <joint name="imu_joint" type="fixed">
+    <parent link="chassis_link" /><child link="imu_link" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </joint>
+
+  <!-- ===================================================================
+       Gazebo (Fortress) plugins.
+       NOTE on naming: Fortress predates the Ignition->Gazebo rename, so
+       system plugin .so files still use the "libignition-gazebo-*"
+       prefix and message types are "ignition.msgs.*". On Harmonic/Jetty
+       you'd swap these for "libgz-sim-*" and "gz.msgs.*" respectively —
+       everything else here stays the same.
+       =================================================================== -->
+
+  <!-- differential drive: subscribes to cmd_vel, publishes odometry.
+       This is the simplest way to get a rover moving; swap this for
+       ign_ros2_control + diff_drive_controller later if you want the
+       exact same controller_manager interface your real rovers use. -->
+  <gazebo>
+    <plugin filename="libignition-gazebo-diff-drive-system.so"
+            name="ignition::gazebo::systems::DiffDrive">
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      <wheel_separation>${wheel_sep}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+      <max_linear_acceleration>1.0</max_linear_acceleration>
+      <topic>/model/${name}/cmd_vel</topic>
+      <odom_topic>/model/${name}/odometry</odom_topic>
+      <!-- tf_topic publishes odom->base_link as a Pose_V message,
+           bridged straight to /tf below. Everything downstream of
+           base_link (wheels, lidar_link, imu_link) is instead handled
+           by robot_state_publisher from joint_states, so frame names
+           stay consistent between the two sources. -->
+      <tf_topic>/model/${name}/tf</tf_topic>
+      <frame_id>${name}/odom</frame_id>
+      <child_frame_id>${name}/base_link</child_frame_id>
+      <odom_publish_frequency>30</odom_publish_frequency>
+    </plugin>
+
+    <plugin filename="libignition-gazebo-joint-state-publisher-system.so"
+            name="ignition::gazebo::systems::JointStatePublisher">
+      <topic>/model/${name}/joint_states</topic>
+    </plugin>
+  </gazebo>
+
+  <gazebo reference="lidar_link">
+    <sensor name="lidar" type="gpu_lidar">
+      <topic>/world/exploration_test/model/${name}/lidar</topic>
+      <frame_id>lidar_link</frame_id>
+      <update_rate>10</update_rate>
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>${lidar_samples}</samples>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.1</min>
+          <max>${lidar_range}</max>
+          <resolution>0.01</resolution>
+        </range>
+      </lidar>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="imu_link">
+    <sensor name="imu" type="imu">
+      <topic>/model/${name}/imu</topic>
+      <frame_id>imu_link</frame_id>
+      <update_rate>50</update_rate>
+      <always_on>true</always_on>
+    </sensor>
+  </gazebo>
+
+</robot>
