@@ -162,7 +162,11 @@ local_costmap:
         enabled: True
         observation_sources: scan
         scan:
-          topic: scan
+          # Absolute on purpose: inside a costmap a relative "scan" resolves to
+          # /<robot>/local_costmap/scan (nobody publishes that), which left the
+          # obstacle layers silently empty.
+          topic: "/<robot>/scan"
+          expected_update_rate: 1.0   # s; warn instead of failing silently if scans stop
           max_obstacle_height: 2.0
           clearing: True
           marking: True
@@ -206,7 +210,11 @@ global_costmap:
         enabled: True
         observation_sources: scan
         scan:
-          topic: scan
+          # Absolute on purpose: inside a costmap a relative "scan" resolves to
+          # /<robot>/local_costmap/scan (nobody publishes that), which left the
+          # obstacle layers silently empty.
+          topic: "/<robot>/scan"
+          expected_update_rate: 1.0   # s; warn instead of failing silently if scans stop
           max_obstacle_height: 2.0
           clearing: True
           marking: True
